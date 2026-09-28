@@ -453,6 +453,34 @@ def test_kron(optimizer):
     _test_model(optimizer, dict(lr=1e-3))
 
 
+def test_adan_load_state_dict_without_foreach():
+    # Param groups saved before timm 1.0.12 have neither 'foreach' nor 'caution'; loading must back-fill both.
+    from timm.optim.adan import Adan
+
+    def make():
+        return Adan([Parameter(torch.ones(4, 3)), Parameter(torch.ones(4))], lr=1e-3, weight_decay=0.1)
+
+    def step(optimizer):
+        for group in optimizer.param_groups:
+            for p in group['params']:
+                p.grad = torch.ones_like(p)
+        optimizer.step()
+
+    optimizer = make()
+    step(optimizer)
+    state_dict = deepcopy(optimizer.state_dict())
+    for group in state_dict['param_groups']:
+        del group['foreach']
+        del group['caution']
+
+    resumed = make()
+    resumed.load_state_dict(state_dict)
+    for group in resumed.param_groups:
+        assert group['foreach'] is None
+        assert group['caution'] is False
+    step(resumed)
+
+
 @pytest.mark.parametrize('saved_corrected_weight_decay', [None, False, True])
 def test_kron_load_state_dict_corrected_weight_decay(saved_corrected_weight_decay):
     # Loading must clear cached expressions and back-fill missing defaults without overwriting saved values.

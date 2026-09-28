@@ -97,6 +97,7 @@ class Adan(Optimizer):
         for group in self.param_groups:
             group.setdefault('no_prox', False)
             group.setdefault('caution', False)
+            group.setdefault('foreach', None)
 
     @torch.no_grad()
     def restart_opt(self):
